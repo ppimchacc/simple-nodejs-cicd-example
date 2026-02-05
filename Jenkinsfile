@@ -1,45 +1,48 @@
 pipeline {
   environment {
     VERCEL_PROJECT_NAME = 'learn-jenkins-app'
-    VERCEL_TOKEN = credentials('devops20-vercel-token') // ดึงจาก Jenkins
+    VERCEL_TOKEN = credentials('devops20-vercel-token')
   }
+
   agent {
     kubernetes {
-      // This YAML defines the "Docker Container" you want to use
       yaml '''
-        apiVersion: v1
-        kind: Pod
-        spec:
-          containers:
-          - name: my-builder  # We will refer to this name later
-            image: node:20-alpine
-            command:
-            - cat
-            tty: true
-      '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: my-builder
+    image: node:20-alpine
+    command:
+    - cat
+    tty: true
+'''
     }
   }
+
   stages {
-    stage('Test npm') {
+
+    stage('Check Node & NPM') {
       steps {
         container('my-builder') {
-          sh 'npm --version'
           sh 'node --version'
+          sh 'npm --version'
         }
       }
     }
-    stage('Build') {
+
+    stage('Install Dependencies') {
       steps {
         container('my-builder') {
           sh 'npm ci'
-          sh 'npm run build'
         }
       }
     }
-    stage('Test Build') {
+
+    stage('Test') {
       steps {
         container('my-builder') {
-          sh 'npm run test'
+          sh 'npm test'
         }
       }
     }
@@ -47,19 +50,12 @@ pipeline {
       steps {
         container('my-builder') {
           sh 'npm install -g vercel@latest'
-          // Deploy using token-only (non-interactive)
           sh '''
             vercel link --project $VERCEL_PROJECT_NAME --token $VERCEL_TOKEN --yes
             vercel --token $VERCEL_TOKEN --prod --confirm
           '''
         }
       }
-    }
-
-  }
-  post {
-    always {
-      junit 'test-results/junit.xml'
     }
   }
 }
